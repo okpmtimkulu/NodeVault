@@ -1,0 +1,49 @@
+{
+  "name": "nodevault",
+  "version": "0.1.0",
+  "description": "Scan, deduplicate, and manage node_modules across all your projects.",
+  "type": "module",
+  "bin": {
+    "nodevault": "./bin/nodevault"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "node_modules",
+    "deduplication",
+    "hardlink",
+    "disk",
+    "cleanup",
+    "projects",
+    "scanner",
+    "lifecycle",
+    "devtools"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/nodevault"
+  },
+  "homepage": "https://github.com/user/nodevault#readme",
+  "files": [
+    "bin/",
+    "src/",
+    "dashboard/",
+    "README.md",
+    "DOCS.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "chokidar": "^4.0.0",
+    "commander": "^13.0.0",
+    "ink": "^6.8.0",
+    "ora": "^8.0.0",
+    "react": "^19.2.5",
+    "sql.js": "^1.14.1"
+  }
+}

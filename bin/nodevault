@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# NodeVault launcher — finds a compatible Node.js (>=20) automatically,
+# checks for missing dependencies, and offers to install them.
+
+set -euo pipefail
+
+REQUIRED_MAJOR=20
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ENTRY="$SCRIPT_DIR/nodevault.js"
+NODE_BIN=""
+
+# ── helpers ──────────────────────────────────────────────────────────
+node_major() {
+  "$1" --version 2>/dev/null | sed 's/v\([0-9]*\).*/\1/'
+}
+
+# ── 1. Try the current node in PATH ─────────────────────────────────
+if command -v node &>/dev/null; then
+  CURRENT=$(node_major node)
+  if [ "${CURRENT:-0}" -ge "$REQUIRED_MAJOR" ] 2>/dev/null; then
+    NODE_BIN="node"
+  fi
+fi
+
+# ── 2. Try nvm (loaded or from common locations) ────────────────────
+load_nvm() {
+  if type nvm &>/dev/null; then return 0; fi
+  for NVM_CANDIDATE in \
+    "${NVM_DIR:-$HOME/.nvm}/nvm.sh" \
+    "$HOME/.nvm/nvm.sh" \
+    "/usr/local/opt/nvm/nvm.sh" \
+    "/opt/homebrew/opt/nvm/nvm.sh"; do
+    if [ -f "$NVM_CANDIDATE" ]; then
+      # shellcheck disable=SC1090
+      source "$NVM_CANDIDATE" --no-use 2>/dev/null
+      return 0
+    fi
+  done
+  return 1
+}
+
+if [ -z "$NODE_BIN" ] && load_nvm; then
+  for VER in $(nvm ls --no-colors 2>/dev/null \
+    | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' \
+    | sort -t. -k1,1rn -k2,2rn -k3,3rn); do
+    MAJOR=$(echo "$VER" | sed 's/v\([0-9]*\).*/\1/')
+    if [ "${MAJOR:-0}" -ge "$REQUIRED_MAJOR" ] 2>/dev/null; then
+      NVM_NODE="$(nvm which "$VER" 2>/dev/null)" || continue
+      if [ -x "$NVM_NODE" ]; then
+        NODE_BIN="$NVM_NODE"
+        break
+      fi
+    fi
+  done
+fi
+
+# ── 3. Try fnm ──────────────────────────────────────────────────────
+if [ -z "$NODE_BIN" ] && command -v fnm &>/dev/null; then
+  for VER in $(fnm ls 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' \
+    | sort -t. -k1,1rn -k2,2rn -k3,3rn); do
+    MAJOR=$(echo "$VER" | sed 's/v\([0-9]*\).*/\1/')
+    if [ "${MAJOR:-0}" -ge "$REQUIRED_MAJOR" ] 2>/dev/null; then
+      # fnm needs exec, so we store the version and handle it at launch
+      NODE_BIN="fnm:$VER"
+      break
+    fi
+  done
+fi
+
+# ── 4. Try Homebrew node@20 / node@22 etc. ──────────────────────────
+if [ -z "$NODE_BIN" ]; then
+  for BREW_VER in 22 20 24; do
+    for PREFIX in "/opt/homebrew" "/usr/local"; do
+      BREW_NODE="$PREFIX/opt/node@$BREW_VER/bin/node"
+      if [ -x "$BREW_NODE" ]; then
+        MAJOR=$(node_major "$BREW_NODE")
+        if [ "${MAJOR:-0}" -ge "$REQUIRED_MAJOR" ] 2>/dev/null; then
+          NODE_BIN="$BREW_NODE"
+          break 2
+        fi
+      fi
+    done
+  done
+fi
+
+# ── 5. No compatible Node found ─────────────────────────────────────
+if [ -z "$NODE_BIN" ]; then
+  echo ""
+  echo "  nodevault requires Node.js >= $REQUIRED_MAJOR but none was found."
+  echo ""
+  echo "  You have a few options:"
+  echo "    • nvm install 22        (if you use nvm)"
+  echo "    • fnm install 22        (if you use fnm)"
+  echo "    • brew install node@22  (macOS)"
+  echo "    • https://nodejs.org    (manual install)"
+  echo ""
+  exit 1
+fi
+
+# ── 6. Check dependencies ───────────────────────────────────────────
+check_deps() {
+  local missing=0
+  for dep in commander sql.js chalk ora chokidar; do
+    if [ ! -d "$PROJECT_DIR/node_modules/$dep" ]; then
+      missing=1
+      break
+    fi
+  done
+  return $missing
+}
+
+if ! check_deps; then
+  echo ""
+  echo "  ╭──────────────────────────────────────────────╮"
+  echo "  │                                              │"
+  echo "  │   Dependencies are not installed.            │"
+  echo "  │                                              │"
+  echo "  │   NodeVault needs to install npm packages    │"
+  echo "  │   before it can run.                         │"
+  echo "  │                                              │"
+  echo "  ╰──────────────────────────────────────────────╯"
+  echo ""
+
+  # Detect available package manager
+  PM="npm"
+  if [ -f "$PROJECT_DIR/yarn.lock" ]; then
+    PM="yarn"
+  elif [ -f "$PROJECT_DIR/pnpm-lock.yaml" ]; then
+    PM="pnpm"
+  fi
+
+  # In a non-interactive shell, just show the manual command and exit
+  if [ ! -t 0 ]; then
+    echo "  Run '$PM install' in $PROJECT_DIR to install them."
+    echo ""
+    exit 1
+  fi
+
+  printf "  Install now with %s? [Y/n] " "$PM"
+  read -r REPLY </dev/tty
+  echo ""
+
+  # Default to yes (empty or y/Y)
+  case "${REPLY:-y}" in
+    [yY]|[yY][eE][sS]|"")
+      echo "  Installing dependencies..."
+      echo ""
+      (cd "$PROJECT_DIR" && $PM install) || {
+        echo ""
+        echo "  Installation failed. Try running '$PM install' manually in:"
+        echo "    $PROJECT_DIR"
+        echo ""
+        exit 1
+      }
+      echo ""
+      ;;
+    *)
+      echo "  Skipped. Run '$PM install' in $PROJECT_DIR when ready."
+      echo ""
+      exit 0
+      ;;
+  esac
+fi
+
+# ── 7. Launch ────────────────────────────────────────────────────────
+if [[ "$NODE_BIN" == fnm:* ]]; then
+  VER="${NODE_BIN#fnm:}"
+  exec fnm exec --using="$VER" node "$ENTRY" "$@"
+else
+  exec "$NODE_BIN" "$ENTRY" "$@"
+fi

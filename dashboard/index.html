@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NodeVault</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+button:hover{filter:brightness(1.15)}
+input::placeholder{color:#3f3f46}
+
+body{
+  min-height:100vh;
+  background:#0a0a0b;
+  color:#e4e4e7;
+  font-family:'JetBrains Mono','SF Mono','Fira Code',monospace;
+  position:relative;
+  overflow-x:hidden;
+}
+
+/* Ambient grid */
+.ambient-grid{
+  position:fixed;inset:0;opacity:0.03;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,0.1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.1) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+
+/* Glow accent */
+.glow-accent{
+  position:fixed;top:-200px;right:-200px;width:600px;height:600px;
+  background:radial-gradient(circle,rgba(16,185,129,0.08) 0%,transparent 70%);
+  pointer-events:none;
+}
+
+/* Toast */
+#toast{
+  position:fixed;top:20px;right:20px;z-index:1000;
+  padding:10px 16px;border-radius:8px;font-size:12px;
+  backdrop-filter:blur(12px);
+  animation:fadeIn 0.2s ease;
+  display:none;
+}
+#toast.success{
+  background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#34d399;
+}
+#toast.error{
+  background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444;
+}
+
+/* Header */
+header{
+  padding:16px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  background:rgba(10,10,11,0.8);
+  backdrop-filter:blur(20px);
+  position:sticky;top:0;z-index:100;
+}
+.logo-box{
+  background:linear-gradient(135deg,#10b981,#059669);
+  border-radius:8px;padding:6px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 20px rgba(16,185,129,0.2);
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-name{font-size:16px;font-weight:700;letter-spacing:-0.02em}
+.brand-ver{font-size:10px;color:#6b7280;margin-left:8px;font-weight:400}
+
+/* Nav tabs */
+.nav-tabs{display:flex;gap:2px;background:rgba(255,255,255,0.04);border-radius:8px;padding:3px}
+.nav-tab{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 14px;border-radius:6px;border:none;
+  background:transparent;color:#6b7280;
+  font-size:11px;font-weight:500;cursor:pointer;
+  font-family:inherit;transition:all 0.15s ease;
+}
+.nav-tab.active{background:rgba(16,185,129,0.15);color:#34d399}
+
+/* Health dot */
+.health-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.health-dot.ok{background:#34d399;box-shadow:0 0 6px rgba(52,211,153,0.5)}
+.health-dot.down{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,0.5)}
+
+/* Main */
+main{max-width:1280px;margin:0 auto;padding:24px 24px 80px}
+
+/* Cards */
+.card{
+  background:rgba(255,255,255,0.02);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:20px;
+}
+
+/* Stats grid */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{border-radius:12px;padding:18px 20px;border:1px solid rgba(255,255,255,0.06)}
+.stat-label{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px}
+.stat-value{font-size:26px;font-weight:700;letter-spacing:-0.03em}
+.stat-sub{font-size:10px;color:#52525b;margin-top:4px}
+
+/* Charts row */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.chart-title{font-size:11px;color:#9ca3af;margin-bottom:16px;font-weight:600}
+
+/* Bar chart */
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-name{font-size:10px;color:#6b7280;width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:18px;background:rgba(255,255,255,0.03);border-radius:4px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:4px;transition:width 0.6s ease}
+.bar-saved{position:absolute;top:0;left:0;height:100%;background:rgba(239,68,68,0.2);border-radius:4px 0 0 4px}
+.bar-size{font-size:10px;color:#9ca3af;width:55px;text-align:right}
+.legend{display:flex;gap:16px;margin-top:12px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:9px;color:#6b7280}
+.legend-dot{width:8px;height:8px;border-radius:2px}
+
+/* Donut */
+.donut-wrap{display:flex;align-items:center;gap:24px}
+.donut-container{position:relative;width:120px;height:120px}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.donut-total{font-size:22px;font-weight:700}
+.donut-label{font-size:9px;color:#6b7280}
+.health-list{display:flex;flex-direction:column;gap:12px;flex:1}
+.health-row{display:flex;align-items:center;justify-content:space-between}
+.health-info{display:flex;align-items:center;gap:8px}
+.health-color{width:8px;height:8px;border-radius:50%}
+.health-name{font-size:11px;font-weight:600}
+.health-desc{font-size:9px;color:#52525b}
+.health-count{font-size:16px;font-weight:700}
+
+/* Quick actions */
+.quick-actions{display:flex;gap:8px;margin-top:20px}
+.action-btn{
+  flex:1;padding:8px 12px;border-radius:8px;
+  font-size:10px;font-weight:600;cursor:pointer;
+  font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;
+}
+
+/* CLI commands grid */
+.cli-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cli-card{background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;border:1px solid rgba(255,255,255,0.04)}
+.cli-cmd{font-size:10px;color:#10b981;display:block;margin-bottom:4px}
+.cli-desc{font-size:9px;color:#52525b}
+
+/* Projects toolbar */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.search-box{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.04);border-radius:8px;
+  padding:6px 12px;flex:1 1 200px;
+  border:1px solid rgba(255,255,255,0.06);
+}
+.search-box input{
+  background:none;border:none;outline:none;color:#e4e4e7;
+  font-size:11px;font-family:inherit;width:100%;
+}
+.filter-tabs{display:flex;gap:2px;background:rgba(255,255,255,0.04);border-radius:8px;padding:3px}
+.filter-tab{
+  padding:5px 12px;border-radius:6px;border:none;
+  background:transparent;color:#6b7280;
+  font-size:10px;cursor:pointer;font-family:inherit;
+  text-transform:capitalize;font-weight:500;
+}
+.filter-tab.active{background:rgba(255,255,255,0.08);color:#e4e4e7}
+.view-toggle{display:flex;gap:2px;background:rgba(255,255,255,0.04);border-radius:8px;padding:3px}
+.view-btn{
+  padding:5px 8px;border-radius:5px;border:none;
+  background:transparent;color:#6b7280;
+  cursor:pointer;display:flex;
+}
+.view-btn.active{background:rgba(255,255,255,0.08);color:#e4e4e7}
+
+/* Project list */
+.project-list{
+  background:rgba(255,255,255,0.02);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;overflow:hidden;
+}
+.list-header,.list-row{
+  display:grid;
+  grid-template-columns:1fr 80px 80px 70px 60px 90px;
+  padding:10px 16px;gap:8px;align-items:center;
+}
+.list-header{
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  font-size:9px;color:#52525b;text-transform:uppercase;letter-spacing:0.06em;
+}
+.list-row{
+  border-bottom:1px solid rgba(255,255,255,0.03);
+  cursor:pointer;transition:background 0.1s ease;
+}
+.list-row:hover{background:rgba(255,255,255,0.02)}
+.proj-name{font-size:12px;font-weight:600;color:#e4e4e7}
+.proj-path{font-size:9px;color:#52525b}
+.text-right{text-align:right}
+.text-size{font-size:12px;font-weight:600}
+.text-muted{font-size:11px;color:#9ca3af}
+
+/* Status badge */
+.badge{font-size:9px;padding:2px 8px;border-radius:99px;font-weight:600;display:inline-block}
+.badge-active{background:rgba(52,211,153,0.12);color:#34d399}
+.badge-stale{background:rgba(251,191,36,0.12);color:#fbbf24}
+.badge-archived{background:rgba(239,68,68,0.12);color:#ef4444}
+
+.linked-yes{color:#10b981;font-size:10px}
+.linked-no{color:#52525b;font-size:10px}
+.last-used{font-size:10px;color:#6b7280;text-align:right}
+
+/* Project grid */
+.project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.grid-card{
+  background:rgba(255,255,255,0.02);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:16px;cursor:pointer;
+  transition:all 0.15s ease;
+}
+.grid-card:hover{border-color:rgba(255,255,255,0.1)}
+.grid-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.grid-name{font-size:13px;font-weight:700}
+.grid-meta{font-size:9px;color:#52525b;margin-top:2px}
+.grid-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.grid-stat-label{font-size:9px;color:#6b7280}
+.grid-stat-value{font-size:14px;font-weight:700}
+.grid-bar{height:4px;background:rgba(255,255,255,0.04);border-radius:2px;margin-top:12px;overflow:hidden}
+.grid-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#ef4444,#fbbf24)}
+.grid-bar-label{font-size:8px;color:#52525b;margin-top:4px}
+
+/* Settings */
+.settings-wrap{max-width:640px;display:flex;flex-direction:column;gap:12px}
+.setting-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.setting-row:last-child{border-bottom:none}
+.setting-label{font-size:11px;font-weight:600}
+.setting-desc{font-size:9px;color:#52525b}
+.setting-value{
+  background:rgba(255,255,255,0.05);border-radius:6px;padding:5px 12px;
+  font-size:11px;color:#10b981;border:1px solid rgba(255,255,255,0.06);
+}
+.toggle{
+  width:36px;height:20px;border-radius:10px;cursor:pointer;
+  position:relative;transition:background 0.2s ease;
+}
+.toggle.on{background:rgba(16,185,129,0.4)}
+.toggle.off{background:rgba(255,255,255,0.1)}
+.toggle-knob{
+  width:16px;height:16px;border-radius:50%;
+  position:absolute;top:2px;transition:left 0.2s ease;
+}
+.toggle.on .toggle-knob{background:#10b981;left:18px}
+.toggle.off .toggle-knob{background:#52525b;left:2px}
+
+.install-card{
+  background:rgba(16,185,129,0.04);
+  border:1px solid rgba(16,185,129,0.1);
+  border-radius:12px;padding:20px;
+}
+.install-title{font-size:13px;font-weight:700;margin-bottom:8px;color:#34d399}
+.install-desc{font-size:10px;color:#6b7280;margin-bottom:12px}
+.install-cmd{
+  display:block;background:rgba(0,0,0,0.3);padding:8px 12px;
+  border-radius:6px;font-size:11px;color:#10b981;
+  border:1px solid rgba(255,255,255,0.04);margin-bottom:6px;
+}
+
+/* Scan progress */
+#scan-bar{
+  position:fixed;bottom:0;left:0;right:0;height:3px;
+  background:rgba(255,255,255,0.05);display:none;z-index:200;
+}
+#scan-fill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,#10b981,#34d399);
+  transition:width 0.3s ease;
+  box-shadow:0 0 20px rgba(16,185,129,0.5);
+}
+
+/* Offline banner */
+#offline-banner{
+  display:none;padding:10px 24px;
+  background:rgba(239,68,68,0.1);border-bottom:1px solid rgba(239,68,68,0.2);
+  color:#ef4444;font-size:11px;text-align:center;
+}
+
+/* Responsive */
+@media(max-width:900px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .charts-row{grid-template-columns:1fr}
+  .cli-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:600px){
+  .stats-grid{grid-template-columns:1fr}
+  .cli-grid{grid-template-columns:1fr}
+  header{flex-wrap:wrap;gap:10px}
+}
+
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="ambient-grid"></div>
+<div class="glow-accent"></div>
+<div id="toast"></div>
+
+<div id="offline-banner">Daemon offline — start it with <code>nodevault daemon start</code></div>
+
+<header>
+  <div class="brand">
+    <div class="logo-box">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>
+      </svg>
+    </div>
+    <div>
+      <span class="brand-name">NodeVault</span>
+      <span class="brand-ver">v0.1.0</span>
+    </div>
+  </div>
+
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-view="dashboard" onclick="switchView('dashboard')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-tab" data-view="projects" onclick="switchView('projects')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      Projects
+    </button>
+    <button class="nav-tab" data-view="settings" onclick="switchView('settings')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Settings
+    </button>
+  </nav>
+
+  <div style="display:flex;align-items:center;gap:12px">
+    <span id="health-indicator" style="font-size:10px;color:#6b7280"><span class="health-dot ok"></span>Online</span>
+    <button id="refresh-btn" onclick="fetchAll()" style="
+      display:flex;align-items:center;gap:6px;
+      padding:7px 16px;border-radius:8px;border:1px solid rgba(16,185,129,0.3);
+      background:rgba(16,185,129,0.15);color:#34d399;font-size:11px;font-weight:600;
+      cursor:pointer;font-family:inherit;
+    ">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      Refresh
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- DASHBOARD VIEW -->
+  <div id="view-dashboard">
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="charts-row">
+      <div class="card">
+        <div class="chart-title">Largest Projects by node_modules</div>
+        <div id="size-chart"></div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(16,185,129,0.3)"></div> Total Size</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(239,68,68,0.25)"></div> Saved</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Project Health Overview</div>
+        <div class="donut-wrap">
+          <div class="donut-container" id="donut-chart"></div>
+          <div class="health-list" id="health-list"></div>
+        </div>
+        <div class="quick-actions" id="quick-actions">
+          <button class="action-btn" style="border:1px solid rgba(16,185,129,0.2);background:rgba(16,185,129,0.08);color:#34d399" onclick="showToast('Run: nodevault clean --all -f')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Auto Clean
+          </button>
+          <button class="action-btn" style="border:1px solid rgba(129,140,248,0.2);background:rgba(129,140,248,0.08);color:#818cf8" onclick="showToast('Run: nodevault link --all')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+            Link All
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="chart-title" style="margin-bottom:0">Quick Start — CLI Commands</div>
+      </div>
+      <div class="cli-grid">
+        <div class="cli-card"><code class="cli-cmd">nodevault scan ~/Projects</code><div class="cli-desc">Discover all node_modules</div></div>
+        <div class="cli-card"><code class="cli-cmd">nodevault link --all</code><div class="cli-desc">Link everything to central store</div></div>
+        <div class="cli-card"><code class="cli-cmd">nodevault clean --all</code><div class="cli-desc">Remove stale/archived node_modules</div></div>
+        <div class="cli-card"><code class="cli-cmd">nodevault prune</code><div class="cli-desc">Remove unreferenced store packages</div></div>
+        <div class="cli-card"><code class="cli-cmd">nodevault status</code><div class="cli-desc">View store health</div></div>
+        <div class="cli-card"><code class="cli-cmd">nodevault watch</code><div class="cli-desc">Auto-manage new projects</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROJECTS VIEW -->
+  <div id="view-projects" class="hidden">
+    <div class="toolbar">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search-input" placeholder="Search projects..." oninput="renderProjects()">
+      </div>
+      <div class="filter-tabs" id="filter-tabs">
+        <button class="filter-tab active" data-filter="all" onclick="setFilter('all')">all</button>
+        <button class="filter-tab" data-filter="active" onclick="setFilter('active')">active</button>
+        <button class="filter-tab" data-filter="stale" onclick="setFilter('stale')">stale</button>
+        <button class="filter-tab" data-filter="archived" onclick="setFilter('archived')">archived</button>
+      </div>
+      <div class="view-toggle">
+        <button class="view-btn active" id="btn-list" onclick="setViewMode('list')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </button>
+        <button class="view-btn" id="btn-grid" onclick="setViewMode('grid')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="project-container"></div>
+  </div>
+
+  <!-- SETTINGS VIEW -->
+  <div id="view-settings" class="hidden">
+    <div class="settings-wrap">
+      <div class="card">
+        <div style="font-size:13px;font-weight:700;margin-bottom:16px">Store Configuration</div>
+        <div id="settings-config"></div>
+      </div>
+      <div class="card">
+        <div style="font-size:13px;font-weight:700;margin-bottom:16px">Auto-Cleanup Rules</div>
+        <div id="settings-rules"></div>
+      </div>
+      <div class="install-card">
+        <div class="install-title">Install NodeVault</div>
+        <div class="install-desc">Install the CLI globally, then start the daemon for auto-management.</div>
+        <code class="install-cmd">npm install -g nodevault</code>
+        <code class="install-cmd">nodevault init</code>
+        <code class="install-cmd">nodevault scan ~/Projects</code>
+        <code class="install-cmd">nodevault daemon start</code>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="scan-bar"><div id="scan-fill"></div></div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let state = {
+  status: null,
+  projects: [],
+  health: null,
+  currentView: 'dashboard',
+  filter: 'all',
+  viewMode: 'list',
+  online: false,
+};
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  const val = bytes / Math.pow(1024, i);
+  return val.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+}
+
+function formatDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const days = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 30) return days + 'd ago';
+  if (days < 365) return Math.floor(days / 30) + 'mo ago';
+  return Math.floor(days / 365) + 'y ago';
+}
+
+function badgeClass(status) {
+  return 'badge badge-' + status;
+}
+
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = type || 'success';
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+// ─── DATA FETCHING ───────────────────────────────────────────────────────────
+async function fetchAll() {
+  try {
+    const [statusRes, projectsRes, healthRes] = await Promise.all([
+      fetch('/api/status'),
+      fetch('/api/projects'),
+      fetch('/api/health'),
+    ]);
+    state.status = await statusRes.json();
+    state.projects = await projectsRes.json();
+    state.health = await healthRes.json();
+    state.online = true;
+    setOnline(true);
+    renderAll();
+  } catch (e) {
+    state.online = false;
+    setOnline(false);
+  }
+}
+
+function setOnline(ok) {
+  const ind = document.getElementById('health-indicator');
+  const banner = document.getElementById('offline-banner');
+  if (ok) {
+    ind.innerHTML = '<span class="health-dot ok"></span>Online';
+    banner.style.display = 'none';
+  } else {
+    ind.innerHTML = '<span class="health-dot down"></span>Offline';
+    banner.style.display = 'block';
+  }
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
+function switchView(id) {
+  state.currentView = id;
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.view === id));
+  ['dashboard', 'projects', 'settings'].forEach(v => {
+    document.getElementById('view-' + v).classList.toggle('hidden', v !== id);
+  });
+}
+
+function setFilter(f) {
+  state.filter = f;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.toggle('active', t.dataset.filter === f));
+  renderProjects();
+}
+
+function setViewMode(m) {
+  state.viewMode = m;
+  document.getElementById('btn-list').classList.toggle('active', m === 'list');
+  document.getElementById('btn-grid').classList.toggle('active', m === 'grid');
+  renderProjects();
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderStats();
+  renderSizeChart();
+  renderDonut();
+  renderProjects();
+  renderSettings();
+}
+
+function renderStats() {
+  const s = state.status;
+  if (!s) return;
+  const total = s.disk.totalNodeModules || 0;
+  const saved = s.disk.saved || 0;
+  const pct = total > 0 ? Math.floor(saved / total * 100) : 0;
+  const staleCount = (s.projects.stale || 0) + (s.projects.archived || 0);
+
+  const cards = [
+    { label: 'Total Size', value: s.disk.totalFormatted || formatBytes(total), sub: s.projects.total + ' projects', color: '#e4e4e7', accent: 'rgba(255,255,255,0.06)' },
+    { label: 'Saved', value: s.disk.savedFormatted || formatBytes(saved), sub: pct + '% recovered', color: '#10b981', accent: 'rgba(16,185,129,0.08)' },
+    { label: 'Stale Projects', value: staleCount, sub: 'candidates for cleanup', color: '#fbbf24', accent: 'rgba(251,191,36,0.08)' },
+    { label: 'Linked', value: s.projects.linked + '/' + s.projects.total, sub: 'using central store', color: '#818cf8', accent: 'rgba(129,140,248,0.08)' },
+  ];
+
+  document.getElementById('stats-grid').innerHTML = cards.map(c =>
+    '<div class="stat-card" style="background:' + c.accent + '">' +
+      '<div class="stat-label">' + c.label + '</div>' +
+      '<div class="stat-value" style="color:' + c.color + '">' + c.value + '</div>' +
+      '<div class="stat-sub">' + c.sub + '</div>' +
+    '</div>'
+  ).join('');
+}
+
+function renderSizeChart() {
+  const projects = [...state.projects].sort((a, b) => (b.totalSizeBytes || 0) - (a.totalSizeBytes || 0)).slice(0, 8);
+  if (projects.length === 0) {
+    document.getElementById('size-chart').innerHTML = '<div style="color:#52525b;font-size:11px">No projects scanned yet</div>';
+    return;
+  }
+  const max = Math.max(...projects.map(p => p.totalSizeBytes || 0));
+  document.getElementById('size-chart').innerHTML = projects.map(p => {
+    const sizePct = max > 0 ? (p.totalSizeBytes / max * 100) : 0;
+    const savedPct = max > 0 ? ((p.savedBytes || 0) / max * 100) : 0;
+    const i = projects.indexOf(p);
+    const opacity = 0.15 + (i / projects.length) * 0.2;
+    return '<div class="bar-row">' +
+      '<span class="bar-name">' + esc(p.name) + '</span>' +
+      '<div class="bar-track">' +
+        '<div class="bar-fill" style="width:' + sizePct + '%;background:linear-gradient(90deg,rgba(16,185,129,0.3),rgba(16,185,129,' + opacity + '))"></div>' +
+        '<div class="bar-saved" style="width:' + savedPct + '%"></div>' +
+      '</div>' +
+      '<span class="bar-size">' + formatBytes(p.totalSizeBytes) + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function renderDonut() {
+  const s = state.status;
+  if (!s) return;
+  const active = s.projects.active || 0;
+  const stale = s.projects.stale || 0;
+  const archived = s.projects.archived || 0;
+  const total = s.projects.total || 0;
+
+  if (total === 0) {
+    document.getElementById('donut-chart').innerHTML = '<div class="donut-center"><span class="donut-total">0</span><span class="donut-label">projects</span></div>';
+    document.getElementById('health-list').innerHTML = '';
+    return;
+  }
+
+  const r = 48, c = 2 * Math.PI * r;
+  const segments = [
+    { count: active, color: '#34d399' },
+    { count: stale, color: '#fbbf24' },
+    { count: archived, color: '#ef4444' },
+  ];
+  let offset = 0;
+  let circles = '';
+  segments.forEach(seg => {
+    const pct = seg.count / total;
+    if (pct > 0) {
+      circles += '<circle cx="60" cy="60" r="' + r + '" fill="none" stroke="' + seg.color + '" stroke-width="16" stroke-dasharray="' + (pct * c) + ' ' + c + '" stroke-dashoffset="' + (-offset) + '" style="opacity:0.7"/>';
+    }
+    offset += pct * c;
+  });
+
+  document.getElementById('donut-chart').innerHTML =
+    '<svg viewBox="0 0 120 120" style="transform:rotate(-90deg)">' + circles + '</svg>' +
+    '<div class="donut-center"><span class="donut-total">' + total + '</span><span class="donut-label">projects</span></div>';
+
+  const items = [
+    { label: 'Active', count: active, color: '#34d399', desc: 'Used in last 30 days' },
+    { label: 'Stale', count: stale, color: '#fbbf24', desc: '30-90 days inactive' },
+    { label: 'Archived', count: archived, color: '#ef4444', desc: '90+ days inactive' },
+  ];
+  document.getElementById('health-list').innerHTML = items.map(it =>
+    '<div class="health-row">' +
+      '<div class="health-info">' +
+        '<div class="health-color" style="background:' + it.color + '"></div>' +
+        '<div><div class="health-name">' + it.label + '</div><div class="health-desc">' + it.desc + '</div></div>' +
+      '</div>' +
+      '<span class="health-count" style="color:' + it.color + '">' + it.count + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+function renderProjects() {
+  const search = (document.getElementById('search-input')?.value || '').toLowerCase();
+  const filtered = state.projects.filter(p => {
+    const matchSearch = !search || p.name.toLowerCase().includes(search) || (p.path || '').toLowerCase().includes(search);
+    const matchFilter = state.filter === 'all' || p.status === state.filter;
+    return matchSearch && matchFilter;
+  });
+
+  const container = document.getElementById('project-container');
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="card" style="text-align:center;color:#52525b;padding:40px">No projects found</div>';
+    return;
+  }
+
+  if (state.viewMode === 'list') {
+    container.innerHTML =
+      '<div class="project-list">' +
+        '<div class="list-header">' +
+          '<div>Project</div><div class="text-right">Size</div><div class="text-right">Saved</div>' +
+          '<div>Status</div><div>Linked</div><div class="text-right">Last Used</div>' +
+        '</div>' +
+        filtered.map(p => {
+          const sizeColor = (p.totalSizeBytes || 0) > 300 * 1024 * 1024 ? '#ef4444' : '#e4e4e7';
+          return '<div class="list-row">' +
+            '<div><div class="proj-name">' + esc(p.name) + '</div><div class="proj-path">' + esc(shortenPath(p.path)) + ' · ' + esc(p.packageManager || 'npm') + '</div></div>' +
+            '<div class="text-right text-size" style="color:' + sizeColor + '">' + formatBytes(p.totalSizeBytes) + '</div>' +
+            '<div class="text-right text-muted">' + formatBytes(p.savedBytes) + '</div>' +
+            '<div><span class="' + badgeClass(p.status) + '">' + p.status + '</span></div>' +
+            '<div>' + (p.linked ? '<span class="linked-yes">&#10003; Yes</span>' : '<span class="linked-no">—</span>') + '</div>' +
+            '<div class="last-used">' + formatDate(p.lastAccessedAt) + '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+  } else {
+    container.innerHTML =
+      '<div class="project-grid">' +
+        filtered.map(p => {
+          const sizeColor = (p.totalSizeBytes || 0) > 300 * 1024 * 1024 ? '#ef4444' : '#e4e4e7';
+          const savedPct = p.totalSizeBytes > 0 ? Math.floor((p.savedBytes || 0) / p.totalSizeBytes * 100) : 0;
+          return '<div class="grid-card">' +
+            '<div class="grid-head">' +
+              '<div><div class="grid-name">' + esc(p.name) + '</div><div class="grid-meta">' + esc(p.packageManager || 'npm') + '</div></div>' +
+              '<span class="' + badgeClass(p.status) + '" style="font-size:8px;padding:2px 6px">' + p.status + '</span>' +
+            '</div>' +
+            '<div class="grid-stats">' +
+              '<div><div class="grid-stat-label">Size</div><div class="grid-stat-value" style="color:' + sizeColor + '">' + formatBytes(p.totalSizeBytes) + '</div></div>' +
+              '<div><div class="grid-stat-label">Saved</div><div class="grid-stat-value" style="color:#fbbf24">' + formatBytes(p.savedBytes) + '</div></div>' +
+            '</div>' +
+            '<div class="grid-bar"><div class="grid-bar-fill" style="width:' + savedPct + '%"></div></div>' +
+            '<div class="grid-bar-label">' + savedPct + '% saved · ' + formatDate(p.lastAccessedAt) + '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+  }
+}
+
+function renderSettings() {
+  const s = state.status;
+  const storePath = s?.store?.path || '~/.nodevault/store';
+
+  const configs = [
+    { label: 'Central Store Path', value: storePath, desc: 'Where shared packages are stored' },
+    { label: 'Packages in Store', value: s?.store?.packages ?? 0, desc: 'Unique packages managed' },
+    { label: 'Store Size', value: s?.store?.sizeFormatted || '0 B', desc: 'Total disk used by store' },
+  ];
+  document.getElementById('settings-config').innerHTML = configs.map((c, i) =>
+    '<div class="setting-row" ' + (i === configs.length - 1 ? 'style="border-bottom:none"' : '') + '>' +
+      '<div><div class="setting-label">' + c.label + '</div><div class="setting-desc">' + c.desc + '</div></div>' +
+      '<div class="setting-value">' + esc(String(c.value)) + '</div>' +
+    '</div>'
+  ).join('');
+
+  const rules = [
+    { label: 'Remove node_modules from archived projects', on: true },
+    { label: 'Auto-link new projects on detection', on: true },
+    { label: 'Prune unreferenced packages from store', on: false },
+    { label: 'Notify before deleting (require confirmation)', on: true },
+  ];
+  document.getElementById('settings-rules').innerHTML = rules.map((r, i) =>
+    '<div class="setting-row" ' + (i === rules.length - 1 ? 'style="border-bottom:none"' : '') + '>' +
+      '<span style="font-size:11px">' + r.label + '</span>' +
+      '<div class="toggle ' + (r.on ? 'on' : 'off') + '"><div class="toggle-knob"></div></div>' +
+    '</div>'
+  ).join('');
+}
+
+function shortenPath(p) {
+  if (!p) return '';
+  return p.replace(/^\/Users\/[^/]+/, '~');
+}
+
+function esc(s) {
+  const el = document.createElement('span');
+  el.textContent = s || '';
+  return el.innerHTML;
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+fetchAll();
+setInterval(fetchAll, 30000);
+</script>
+</body>
+</html>
