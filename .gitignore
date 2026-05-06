@@ -1,0 +1,13 @@
+node_modules/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+daemon.pid
+daemon.port
+daemon.log
+*.log
+
+.claude/
+claude.md
+plan.md
